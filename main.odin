@@ -1,6 +1,7 @@
 package gtime
 
 import "core:fmt"
+import "core:math"
 import "core:mem"
 import "core:os"
 import "core:strconv"
@@ -29,7 +30,7 @@ main :: proc() {
 		mem.tracking_allocator_destroy(&track)
 	}
 	rl.InitWindow(400, 800, "gtime")
-	//t = time.time_add(time.now(), cast(time.Duration)-59 * time.Second)
+	rl.SetTargetFPS(60)
 
 	args := os.args[1:]
 	split_args: []string
@@ -45,23 +46,37 @@ main :: proc() {
 	should_close := false
 	should_check_time := true
 	seconds_passed: cstring
+	minutes_passed_msg: cstring
+	minuted_passed: i32
 	color: rl.Color = rl.LIGHTGRAY
-	wait_time: time.Time = time.now()
 	width := rl.GetScreenWidth() / 2
 	height := rl.GetScreenHeight() / 2
 	buff: [8]byte
 	t := time.now()
+	t = time.time_add(time.now(), cast(time.Duration)-59 * time.Second)
+	wait_time: time.Time = time.now()
+	wait_time = t
 	s: f64
 	for should_close == false {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK)
 		switch should_check_time {
 		case true:
-			if (time.duration_milliseconds(time.since(wait_time)) >= 100) {
+			if (time.duration_milliseconds(time.since(t)) >= 100) {
 				s = time.duration_seconds(time.since(t))
-				wait_time = time.now()
-				seconds_passed = strings.clone_to_cstring(
-					strconv.ftoa(buff[:], s, 'f', 1, 64),
+				strconv.ftoa(
+					buff[:],
+					math.mod_f64(s, cast(f64)time.SECONDS_PER_MINUTE),
+					'f',
+					1,
+					64,
+				)
+				seconds_passed = strings.clone_to_cstring(string(buff[:]), context.temp_allocator)
+				if (cast(int)s / 60 >= 1) {
+					minuted_passed += 1
+				}
+				minutes_passed_msg = strings.clone_to_cstring(
+					strconv.itoa(buff[:], cast(int)minuted_passed),
 					context.temp_allocator,
 				)
 				if (s >= wait_minutes * 60 + wait_seconds) {
@@ -70,8 +85,13 @@ main :: proc() {
 				}
 			}
 		}
-		rl.DrawText(seconds_passed, width, height, 18, color)
-
+		rl.DrawText(
+			rl.TextFormat("%s:%s", minutes_passed_msg, seconds_passed),
+			width,
+			height,
+			18,
+			color,
+		)
 		key := rl.GetKeyPressed()
 		if (key == rl.KeyboardKey.Q || key == rl.KeyboardKey.ESCAPE) {
 			should_close = true
